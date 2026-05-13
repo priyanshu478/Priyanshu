@@ -118,7 +118,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);dis
     <div class="setup-icon">🔑</div>
     <div class="setup-title">Welcome to <span style="color:var(--accent)">NexusAI</span></div>
     <div class="setup-sub">Enter your Anthropic API key to get started. Stored only in your browser — never shared.</div>
-    <input class="setup-input" id="api-key-input" type="password" placeholder="sk-ant-api03-..."/>
+    <input class="setup-input" id="api-key-input" type="password" placeholder="AIzaSy..."/>
     <button class="setup-btn" onclick="saveKey()">✦ Start Using NexusAI</button>
     <div class="setup-note">Get free API key at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a></div>
   </div>
@@ -215,7 +215,7 @@ window.addEventListener('load',()=>{
   setupSpeech();
 });
 function init(){chats=JSON.parse(localStorage.getItem('nexus_chats')||'[]');if(chats.length===0)newChat();else{currentChatId=chats[0].id;renderAll();}setupInput();updateMemoryBtn();}
-function saveKey(){const k=document.getElementById('api-key-input').value.trim();if(!k||!k.startsWith('sk-')){showToast('⚠️ Enter valid API key (starts with sk-)');return;}API_KEY=k;localStorage.setItem('nexus_api_key',k);document.getElementById('setup-screen').style.display='none';init();}
+function saveKey(){const k=document.getElementById('api-key-input').value.trim();if(k.length<10){showToast('⚠️ Enter valid API key (starts with sk-)');return;}API_KEY=k;localStorage.setItem('nexus_api_key',k);document.getElementById('setup-screen').style.display='none';init();}
 function changeKey(){localStorage.removeItem('nexus_api_key');document.getElementById('api-key-input').value='';document.getElementById('setup-screen').style.display='flex';}
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&document.getElementById('setup-screen').style.display!=='none')saveKey();});
 function newChat(){const id=Date.now();chats.unshift({id,mode:'chat',title:'New Chat',messages:[]});currentChatId=id;currentMode='chat';saveChats();renderAll();setModeUI('chat');}
@@ -271,11 +271,12 @@ async function callAPI(chat){
   return data.content.map(b=>b.text||'').join('');
 }
 async function callDirect(system,messages){
-  const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':API_KEY,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,system,messages})});
-  const data=await res.json();if(data.error)throw new Error(data.error.message);
-  return data.content.map(b=>b.text||'').join('');
-}
-function toggleTranslator(){document.getElementById('translator-panel').classList.toggle('show');document.getElementById('trans-toggle').classList.toggle('active');}
+  const contents=messages.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]}));
+  const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({system_instruction:{parts:[{text:system}]},contents,generationConfig:{maxOutputTokens:1000}})});
+  const data=await res.json();
+  if(data.error)throw new Error(data.error.message);
+  return data.candidates?.[0]?.content?.parts?.[0]?.text||'No response';
+}function toggleTranslator(){document.getElementById('translator-panel').classList.toggle('show');document.getElementById('trans-toggle').classList.toggle('active');}
 async function doTranslate(){
   const text=document.getElementById('trans-input').value.trim();if(!text){showToast('⚠️ Enter text first');return;}
   const from=document.getElementById('from-lang').value;const to=document.getElementById('to-lang').value;
